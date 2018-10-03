@@ -72,6 +72,8 @@ class Robot:
         self.vx_p = 0
         self.vy_p = 0
 
+        self.inked = []
+
 
         #Set up variables for the Jacobian
         dxpdx = 1
@@ -89,16 +91,18 @@ class Robot:
         self.y += q[1]
         #Takes care of the angular velocity??
         self.theta = q[2]
-        self.x_p += self.vx_p
-        self.y_p += self.vy_p
-
+        # self.x_p += self.vx_p
+        # self.y_p += self.vy_p
+        self.x_p = self.x + 12*np.cos(self.theta)
+        self.y_p = self.y + 12*np.sin(self.theta)
     def ink(self):
         enable_stroke()
-        draw_point(self.x_p, self.y_p)
+        for point in self.inked:
+             draw_point(point[0], point[1])
     def draw_robot(self):
         clear()
         #draw pen
-        draw_line(self.x, self.x + 5*np.cos(self.theta), self.y, self.y +5*np.cos(self.theta))
+
         #draw robot as pointmass
         draw_circle(self.x,self.y, 10)
         dxpdx = 1
@@ -127,13 +131,16 @@ class Robot:
         wheel_vec = (2/self.wheel_rad) *  np.dot(inv_jprime, q)
 
         if is_key_pressed("a"):
-            self.vx_p = -0.2
-        elif is_key_pressed("b"):
-            self.vx_p = 0.2
-        elif is_key_pressed("w"):
-            self.vy_p = 0.2
-        elif is_key_pressed("x"):
-            self.vy_p = -0.2
+            self.vx_p = -0.5
+        if is_key_pressed("d"):
+            self.vx_p = 0.5
+        if is_key_pressed("w"):
+            self.vy_p = 0.5
+        if is_key_pressed("x"):
+            self.vy_p = -0.5
+        if is_key_pressed("s"):
+            self.vy_p = 0
+            self.vx_p = 0
         #def
         # if is_key_pressed("a") :
         #     self.v_x = -0.2
@@ -148,18 +155,27 @@ class Robot:
         #     self.y = 0
 
         #actually drawing the robot and pen.
+        enable_smoothing()
         self.update_position(q)
         enable_stroke()
+        self.inked.append((self.x_p,self.y_p))
+        set_stroke_color(0, 0, 0)
         self.ink()
+        #Draw line to pen
+        set_stroke_color(1, 1, 1)
         draw_line(self.x, self.y,  self.x_p, self.y_p)
         set_fill_color(1, 0, 0)
-        draw_circle(self.x_p, self.y_p, 3)
+        draw_circle(self.x_p, self.y_p, 5)
         set_fill_color(0, 1, 0)
-        draw_circle(self.x,self.y, 10)
-        set_fill_color(1, 0, 0)
-
-
-
+        #draw bot
+        disable_fill()
+        draw_circle(self.x,self.y, 20)
+        enable_fill()
+        set_fill_color(0, 0, 1)
+        draw_circle(self.x - 2 *self.robdiam, self.y - 2*self.robdiam, self.robdiam/3)
+        draw_circle(self.x + 2* self.robdiam, self.y +2 * self.robdiam, self.robdiam/3)
+        set_fill_color(0, 0, 1)
+        draw_line(self.x, self.y,  self.x_p, self.y_p)
 
 Robot = Robot(x=WIDTH/2, y=HEIGHT/2)
 start_graphics(Robot.draw_robot, width=WIDTH, height=HEIGHT, framerate=60)
