@@ -4,68 +4,23 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.linalg import pinv
 
-FRAMERATE = 1
+FRAMERATE = 60
 WIDTH = 400
 HEIGHT = 400
 TIMESTEP = 1/FRAMERATE
-
-# def draw_robot():
-#     vx_p = 0
-#     vy_p = 0
-#     x = 0
-#     y = 0
-#     theta = 0
-#     x_p = x + np.cos(theta)
-#     y_p = y + np.sin(theta)
-#     dxpdx = 1
-#     dxpdy = 0
-#     dxpd0= -np.sin(theta)
-#     dypdx = 0
-#     dypdy = 1
-#     dypd0= np.cos(theta)
-#     robdiam = 0.05
-#     wheel_rad = 0.03
-
-#     self.Jac = np.zeros(shape=(2,3))
-#     print self.Jac
-#     self.Jac[0] = [dxpdx,dxpdy,dxpd0]
-#     self.Jac[1] = [dypdx,dypdy,dypd0]
-
-#     print self.Jac.shape
-#     print pen_vel(0,0)
-#     inv_self.Jac = pinv(self.Jac)
-#     print inv_self.Jac.shape
-#     q = np.dot(inv_self.Jac,pen_vel(0,0))
-#     print q
-
-#     jprime = np.zeros(shape=(3,2))
-#     jprime[0] = [np.sin(theta), np.sin(theta)]
-#     jprime[1] = [np.cos(theta), np.cos(theta)]
-#     jprime[2] = [robdiam, robdiam]
-
-#     inv_jprime = pinv(jprime)
-
-#     wheel_vec = (2/wheel_rad) *  np.dot(inv_jprime, q)
+penlength = 15
 
 
-
-
-def rob_angv(wheel_vec, wheel_rad, bot_diam):
-    return wheel_rad * (wheel_vec[0] - wheel_vec[1]) / (2* bot_diam)
-
-def pen_vel(x_p, y_p):
-    return np.array([[x_p],[y_p]])
 # def center_vel(self.Jac, pen_vel)
 
-
 class Robot:
-    def __init__(self, x=0, y=0 , theta=np.pi/2, x_p=0, y_p=0, wheel_rad = 0.003, robdiam = 0.05):
+    def __init__(self, x=0, y=0 , theta=np.pi/2, x_p=0, y_p=0, wheel_rad = 0.3, robdiam = 10):
         self.x = x
         self.y = y
         self.theta = theta
         self.omega = 0
-        self.x_p = self.x + 10*np.cos(self.theta)
-        self.y_p = self.y + 10*np.sin(self.theta)
+        self.x_p = self.x + penlength*np.cos(self.theta)
+        self.y_p = self.y + penlength*np.sin(self.theta)
         self.wheel_rad = wheel_rad
         self.wheel_vel = 0
         self.robdiam = robdiam
@@ -86,15 +41,33 @@ class Robot:
         self.Jac[0] = [dxpdx,dxpdy,dxpd0]
         self.Jac[1] = [dypdx,dypdy,dypd0]
 
+    def rob_angv(self, wheel_vec, wheel_rad, bot_diam):
+            return wheel_rad * (wheel_vec[0] - wheel_vec[1]) / (2* bot_diam)
+
+    def pen_vel(self, x_p, y_p):
+        return np.array([[x_p],[y_p]])
+
     def update_position(self, q):
+
         self.x += q[0]
         self.y += q[1]
         #Takes care of the angular velocity??
         self.theta = q[2]
         # self.x_p += self.vx_p
         # self.y_p += self.vy_p
-        self.x_p = self.x + 12*np.cos(self.theta)
-        self.y_p = self.y + 12*np.sin(self.theta)
+        self.x_p = self.x + penlength*np.cos(self.theta)
+        self.y_p = self.y + penlength*np.sin(self.theta)
+        # if self.x - self.robdiam < 0 or self.x + self.robdiam > WIDTH or self.y + self.robdiam > HEIGHT or self.y - self.robdiam < 0:
+        #     # self.x -= 2 * q[0]
+        #     # self.y -= 2 * q[1]
+        #     print self.x, self.y
+
+        #     self.vx_p = -2 * self.vx_p
+        #     self.vy_p = -2 * self.v
+        #     print self.x_p, self.vx_p
+        #     print self.y_p, self.vy_p
+
+
     def ink(self):
         enable_stroke()
         for point in self.inked:
@@ -104,14 +77,14 @@ class Robot:
         #draw pen
 
         #draw robot as pointmass
-        draw_circle(self.x,self.y, 10)
+        #Set gradient
         dxpdx = 1
         dxpdy = 0
         dxpd0= -np.sin(self.theta)
         dypdx = 0
         dypdy = 1
         dypd0= np.cos(self.theta)
-
+        #Set columns of the Jacobian.
         self.Jac = np.zeros(shape=(2,3))
         self.Jac[0] = [dxpdx,dxpdy,dxpd0]
         self.Jac[1] = [dypdx,dypdy,dypd0]
@@ -119,7 +92,11 @@ class Robot:
         inv_Jac = pinv(self.Jac)
         #Take the dot product of the inverse Jacobian and pen velocity to get
         #The velocity vector.
-        q = np.dot(inv_Jac,pen_vel(self.vx_p,self.vy_p))
+        q = np.dot(inv_Jac,self.pen_vel(self.vx_p,self.vy_p))
+        #Update the position vector with q, the velocity vector
+        # q = [vx, vy, w]
+        self.update_position(q)
+
         #Inverse matrix to get the wheel velocities
         jprime = np.zeros(shape=(3,2))
         jprime[0] = [np.sin(self.theta), np.sin(self.theta)]
@@ -130,6 +107,8 @@ class Robot:
         #velocity vector for each of the wheels.
         wheel_vec = (2/self.wheel_rad) *  np.dot(inv_jprime, q)
 
+
+        #Interactive control directions, choose where the pen goes.
         if is_key_pressed("a"):
             self.vx_p = -0.5
         if is_key_pressed("d"):
@@ -155,8 +134,8 @@ class Robot:
         #     self.y = 0
 
         #actually drawing the robot and pen.
-        enable_smoothing()
         self.update_position(q)
+        enable_smoothing()
         enable_stroke()
         self.inked.append((self.x_p,self.y_p))
         set_stroke_color(0, 0, 0)
@@ -165,15 +144,14 @@ class Robot:
         set_stroke_color(1, 1, 1)
         draw_line(self.x, self.y,  self.x_p, self.y_p)
         set_fill_color(1, 0, 0)
-        draw_circle(self.x_p, self.y_p, 5)
-        set_fill_color(0, 1, 0)
+        draw_circle(self.x_p, self.y_p, 6)
+        set_fill_color(0, 0, 0)
         #draw bot
-        disable_fill()
-        draw_circle(self.x,self.y, 20)
+        draw_circle(self.x,self.y, 10)
         enable_fill()
-        set_fill_color(0, 0, 1)
-        draw_circle(self.x - 2 *self.robdiam, self.y - 2*self.robdiam, self.robdiam/3)
-        draw_circle(self.x + 2* self.robdiam, self.y +2 * self.robdiam, self.robdiam/3)
+        set_fill_color(0,0.1, 1)
+        draw_circle(self.x - self.robdiam, self.y - self.robdiam, self.robdiam/3)
+        draw_circle(self.x + self.robdiam, self.y +  self.robdiam, self.robdiam/3)
         set_fill_color(0, 0, 1)
         draw_line(self.x, self.y,  self.x_p, self.y_p)
 
