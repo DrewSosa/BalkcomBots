@@ -4,11 +4,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.linalg import pinv
 
-FRAMERATE = 60
+FRAMERATE = 30
 WIDTH = 400
 HEIGHT = 400
-TIMESTEP = 1/FRAMERATE
-penlength = 15
+TIMESTEP = float(1.0/FRAMERATE)
+PENLENGTH = 20
+PENVELOCITY = 2
 
 
 # def center_vel(self.Jac, pen_vel)
@@ -19,8 +20,8 @@ class Robot:
         self.y = y
         self.theta = theta
         self.omega = 0
-        self.x_p = self.x + penlength*np.cos(self.theta)
-        self.y_p = self.y + penlength*np.sin(self.theta)
+        self.x_p = self.x + PENLENGTH*np.cos(self.theta)
+        self.y_p = self.y + PENLENGTH*np.sin(self.theta)
         self.wheel_rad = wheel_rad
         self.wheel_vel = 0
         self.robdiam = robdiam
@@ -42,24 +43,24 @@ class Robot:
         self.Jac[1] = [dypdx,dypdy,dypd0]
 
     def rob_angv(self, wheel_vec, wheel_rad, bot_diam):
-            return wheel_rad * (wheel_vec[0] - wheel_vec[1]) / (2* bot_diam)
+            return wheel_rad * (wheel_vec[0] - wheel_vec[1]) / (2* bot_ddiam)
 
     def pen_vel(self, x_p, y_p):
         return np.array([[x_p],[y_p]])
 
-    def update_position(self, q):
+    def update_position(self, qdot):
 
-        self.x += q[0]
-        self.y += q[1]
+        self.x += qdot[0] *TIMESTEP
+        self.y += qdot[1] * TIMESTEP
         #Takes care of the angular velocity??
-        self.theta = q[2]
+        self.theta += qdot[2] * TIMESTEP
         # self.x_p += self.vx_p
         # self.y_p += self.vy_p
-        self.x_p = self.x + penlength*np.cos(self.theta)
-        self.y_p = self.y + penlength*np.sin(self.theta)
+        self.x_p +=  self.vx_p * TIMESTEP
+        self.y_p += self.vy_p * TIMESTEP
         # if self.x - self.robdiam < 0 or self.x + self.robdiam > WIDTH or self.y + self.robdiam > HEIGHT or self.y - self.robdiam < 0:
-        #     # self.x -= 2 * q[0]
-        #     # self.y -= 2 * q[1]
+        #     # self.x -= 2 * qdot[0]
+        #     # self.y -= 2 * qdot[1]
         #     print self.x, self.y
 
         #     self.vx_p = -2 * self.vx_p
@@ -92,10 +93,11 @@ class Robot:
         inv_Jac = pinv(self.Jac)
         #Take the dot product of the inverse Jacobian and pen velocity to get
         #The velocity vector.
-        q = np.dot(inv_Jac,self.pen_vel(self.vx_p,self.vy_p))
-        #Update the position vector with q, the velocity vector
-        # q = [vx, vy, w]
-        self.update_position(q)
+        qdot = np.dot(inv_Jac,self.pen_vel(self.vx_p,self.vy_p))
+
+        #Update the position vector with qdot, the velocity vector
+        # qdot = [vx, vy, w]
+        self.update_position(qdot)
 
         #Inverse matrix to get the wheel velocities
         jprime = np.zeros(shape=(3,2))
@@ -105,18 +107,18 @@ class Robot:
         inv_jprime = pinv(jprime)
 
         #velocity vector for each of the wheels.
-        wheel_vec = (2/self.wheel_rad) *  np.dot(inv_jprime, q)
+        wheel_vec = (2/self.wheel_rad) *  np.dot(inv_jprime, qdot)
 
 
         #Interactive control directions, choose where the pen goes.
         if is_key_pressed("a"):
-            self.vx_p = -0.5
+            self.vx_p = -PENVELOCITY
         if is_key_pressed("d"):
-            self.vx_p = 0.5
+            self.vx_p = PENVELOCITY
         if is_key_pressed("w"):
-            self.vy_p = 0.5
+            self.vy_p = -PENVELOCITY
         if is_key_pressed("x"):
-            self.vy_p = -0.5
+            self.vy_p = PENVELOCITY
         if is_key_pressed("s"):
             self.vy_p = 0
             self.vx_p = 0
@@ -134,7 +136,7 @@ class Robot:
         #     self.y = 0
 
         #actually drawing the robot and pen.
-        self.update_position(q)
+        self.update_position(qdot)
         enable_smoothing()
         enable_stroke()
         self.inked.append((self.x_p,self.y_p))
@@ -142,16 +144,17 @@ class Robot:
         self.ink()
         #Draw line to pen
         set_stroke_color(1, 1, 1)
+
         draw_line(self.x, self.y,  self.x_p, self.y_p)
         set_fill_color(1, 0, 0)
-        draw_circle(self.x_p, self.y_p, 6)
+        draw_circle(self.x_p, self.y_p, 8)
         set_fill_color(0, 0, 0)
         #draw bot
-        draw_circle(self.x,self.y, 10)
+        draw_circle(self.x,self.y, 12)
         enable_fill()
         set_fill_color(0,0.1, 1)
-        draw_circle(self.x - self.robdiam, self.y - self.robdiam, self.robdiam/3)
-        draw_circle(self.x + self.robdiam, self.y +  self.robdiam, self.robdiam/3)
+        draw_circle(self.x - self.robdiam, self.y - self.robdiam, self.robdiam/2)
+        draw_circle(self.x + self.robdiam, self.y +  self.robdiam, self.robdiam/2)
         set_fill_color(0, 0, 1)
         draw_line(self.x, self.y,  self.x_p, self.y_p)
 
