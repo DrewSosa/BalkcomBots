@@ -1,3 +1,9 @@
+"""Turn function for CS81 HW3.
+Team Members: Andrew Sosanya, Anne Sherrill, Dev Jhaveri, Lisa Oh
+
+ Find in git repository BalkcomBots.
+ """
+
 import rospy
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist
@@ -19,6 +25,9 @@ def yaw_from_odom(msg):
     return yaw
 
 def compute_vel_from_angle(error):
+
+    #If error is greater than one, keep going the same speed
+    #else, slow down the robot as it approaches the target distance
     if error > 1:
         return .5
     else:
@@ -29,6 +38,11 @@ def compute_vel_from_angle(error):
         return temp_vel
 
 def compute_vel_from_dist(error):
+
+    #If error is greater than one, keep going the same speed
+    #else, slow down the robot as it approaches the target distance
+
+    #Hardcoded upperbound and lowerbound
     if error > .5:
         return .15
     else:
@@ -47,17 +61,25 @@ class Forward:
         self.target_point = array((self.target_x, self.target_y))
 
     def act(self):
+        #Error gives us our current distance from our target position.
         error = norm(self.target_point - array((self.state.x, self.state.y)))
         rospy.loginfo("Current x, y: " + str(self.state.x) + ", " + str(self.state.y))
 
+        #if still not at target, compute the next move to make.
         if(error > .02):
+
             move_cmd = Twist()
             move_cmd.linear.x = compute_vel_from_dist(error)
             self.state.cmd_vel.publish(move_cmd)
 
         else:
+            #Push an empty Twist to stop the robot and finish the action
             self.state.cmd_vel.publish(Twist())
             self.done = True
+
+    def __str__(self):
+        print "drove " + dist + " meters forwards"
+
 
 class TurnLeft:
     def __init__(self, state, angle):
@@ -67,6 +89,8 @@ class TurnLeft:
         self.done = False
 
     def act(self):
+        #if still not at target, compute the next move to make.
+
         error = abs(self.target_angle - self.state.angle)
         rospy.loginfo("Current angle: " + str( self.state.angle))
 
@@ -79,6 +103,8 @@ class TurnLeft:
             self.state.cmd_vel.publish(Twist())
             self.done = True
 
+    def __str__(self):
+        print "Turned Left by " + angle + " radians"
 class TurnRight:
     def __init__(self, state, angle):
         self.state = state
@@ -100,7 +126,56 @@ class TurnRight:
             self.state.cmd_vel.publish(Twist())
             self.done = True
 
+    def __str__(self):
+        print "Turned right by " + angle + " radians"
 
+class PenDraw:
+    #get desired x_p, y_p,
+    #comput P^-1 = [v,w]
+    #Send [v,w] to robot, probably using our turn and drive functions
+    #which nets us a new Quwu
+    def __init__(self,state,penv):
+        self.state = state
+        self.penv = penv
+        self.rad = .5
+
+    def act(self):
+        move_cmd = Twist()
+        updateposition(move_cmd)
+
+        self.state.cmd_vel.publish(move_cmd)
+        rospy.loginfo("Target velocity: " + str(self.penv))
+        self.done = False
+
+    def computeJac(self,angle):
+        dxpdx = 1
+        dxpdy = 0
+        dxpd0= -np.sin(theta)
+        dypdx = 0
+        dypdy = 1
+        Jac[0] = [dxpdx,dxpdy,dxpd0]
+        Jac[1] = [dypdx,dypdy,dypd0]
+
+        Jac = np.zeros(shape=(2,2))
+        Jac[0] = [np.cos(angle), -self.rad * np.sin(angle)]
+        Jac[1] = [np.cos(angle), self.rad * np.sin(angle)]
+        return Jac
+
+    def inverseJac(self, Jac):
+        jprime = np.zeros(shape=(3,2))
+        jprime[0] = [np.sin(self.theta), np.sin(self.theta)]
+        jprime[1] = [np.cos(self.theta), np.cos(self.theta)]
+        jprime[2] = [self.robdiam, self.robdiam]
+        inv_jprime = pinv(jprime)
+        return inv_jprime
+
+    def updateposition(self,q, movecmd):
+        #Multiply by the timestep -- which is the rate
+        inverseJac(self.computeJac(pi/2))
+
+        movecmd.linear.x += 1/20 * qdot[0]
+        movecmd.linear.y += 1/20 * qdot[1]
+        movecmd.angular.z += 1/20 *qdot[2]
 
 class TurtlebotState:
     def __init__(self):
@@ -136,15 +211,21 @@ class TurtlebotState:
         rospy.loginfo("Goodbye.")
 
 
+
+
 def main():
+    #?
     rospy.init_node("turn_to")
 
-    state = TurtlebotState()
+    #initialize our turtlebot to start taking actions.
 
+    state = TurtlebotState()
+    #Sends a shutdown message to rospy to stop execution
     rospy.on_shutdown(state.shutdown)
 
     rate = rospy.Rate(20)
 
+    #Queue of actions to take
     actions = [('L', pi/2), ('R', pi/2), ('F', .5)]
 
     while not rospy.is_shutdown():
