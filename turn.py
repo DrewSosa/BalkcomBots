@@ -13,8 +13,9 @@ from math import cos
 from math import sin
 from numpy.linalg import norm
 from numpy import array
-from numpy import invert as inv
+from numpy.linalg import inv
 import numpy as np
+
 
 
 from angles import rectify_angle_pi
@@ -126,18 +127,24 @@ class PenDraw:
     def __init__(self,state, penv, draw_time):
         self.state = state
         self.penv = penv
-        self.rad = .5
+        self.rad = .05
         self.draw_time = draw_time
+        self.done = False
 
     def act(self):
         move_cmd = Twist()
         rospy.loginfo("Target velocity: " + str(self.penv))
-        for i in xrange(self.draw_time):
+        start_time = rospy.get_time()
+        print ("start_time = " + str(start_time))
+        while rospy.get_time() < start_time + self.draw_time:
             self.updateposition(move_cmd)
             self.state.cmd_vel.publish(move_cmd)
-            rospy.sleep(1)
+            # rospy.sleep(20)
+            print(rospy.get_time())
         rospy.loginfo("Target velocity: " + str(self.penv))
         #when should we stop it?
+        self.state.cmd_vel.publish(Twist())
+        self.done = True
 
     def computeJac(self):
         Jac = np.zeros(shape=(2,2))
@@ -146,12 +153,14 @@ class PenDraw:
         return Jac
 
     def inverseJac(self, Jac):
+        print("here")
+        print(str(Jac))
         return inv(Jac)
 
     def updateposition(self, movecmd):
         #Multiply by the timestep -- which is the rate
         #should give [v,w]
-        control = np.matmul(self.inverseJac(self.computeJac), self.penv)
+        control = np.matmul(self.inverseJac(self.computeJac()), self.penv)
 
         movecmd.linear.x = control[0]
         movecmd.angular.z = control[1]
@@ -178,7 +187,7 @@ class TurtlebotState:
 
     def update_odom(self, msg):
         self.angle = yaw_from_odom(msg)
-        print (str(msg.pose.pose.position))
+        #print (str(msg.pose.pose.position))
         self.x = msg.pose.pose.position.x
         self.y = msg.pose.pose.position.y
         self.ready = True
@@ -191,8 +200,6 @@ class TurtlebotState:
         rospy.loginfo("Goodbye.")
 
 
-
-
 def main():
     #?
     rospy.init_node("turn_to")
@@ -200,26 +207,29 @@ def main():
     #initialize our turtlebot to start taking actions.
 
     state = TurtlebotState()
+    print "The angle is" + str(state.angle)
+    turn_angle = -1 * state.angle
     #Sends a shutdown message to rospy to stop execution
     rospy.on_shutdown(state.shutdown)
 
     rate = rospy.Rate(20)
-
+    #('T', 2*pi/3), ('T', -3*pi/4), ('F', .5),
     #Queue of actions to take
-    actions = [('T', 2*pi/3), ('T', -3*pi/4), ('F', .5), ('PD', [.2, 0], 5)]
+    actions = [('T', turn_angle), ('PD', [-.2, 0], 8), ('PD', [0, .2], 5), ('PD', [.2, 0], 5), ('T', 2*pi/3), ('T', -2*pi/3), ('F', .5)]
     #while rospy is executing method run the queue of commands.
     while not rospy.is_shutdown():
         for i in range(0, len(actions)):
 
             if actions[i][0] == 'T':
                 current_action = Turn(state, actions[i][1])
-            if actions[i][0] == 'F':
+            elif actions[i][0] == 'F':
                 current_action = Forward(state, actions[i][1])
             else:
                 current_action = PenDraw(state, actions[i][1], actions[i][2])
             while not current_action.done:
                 current_action.act()
                 rate.sleep()
+            rospy.sleep(1)
         break
     rate.sleep()
 
