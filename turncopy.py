@@ -142,12 +142,11 @@ class PenDraw:
         self.rad = .5
 
 
-    def act(self):
+    def act(self, draw_time):
         move_cmd = Twist()
-        draw_time = 5
-        updateposition(move_cmd)
         rospy.loginfo("Target velocity: " + str(self.penv))
         for i in xrange(draw_time):
+            updateposition(move_cmd)
             self.state.cmd_vel.publish(move_cmd)
             rospy.sleep(1)
         rospy.loginfo("Target velocity: " + str(self.penv))
@@ -165,7 +164,7 @@ class PenDraw:
     def inverseJac(self, Jac):
         return inv(Jac)
 
-    def updateposition(self,q, movecmd):
+    def updateposition(self, movecmd):
         #Multiply by the timestep -- which is the rate
         #should give [v,w]
         control = inverseJac(self.computeJac) * self.penv
