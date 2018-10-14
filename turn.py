@@ -59,6 +59,7 @@ class Forward:
         self.target_x = self.state.x + dist * cos(self.state.angle)
         self.target_y = self.state.y + dist * sin(self.state.angle)
         self.target_point = array((self.target_x, self.target_y))
+        self.total_dist = dist
 
     def act(self):
         #Error gives us our current distance from our target position.
@@ -78,56 +79,41 @@ class Forward:
             self.done = True
 
     def __str__(self):
-        print "drove " + dist + " meters forwards"
+        print "drove " + str(self.total_dist) + " meters forwards"
 
-
-class TurnLeft:
+class Turn:
     def __init__(self, state, angle):
+        if angle < 0:
+            self.direction = 'R'
+        else:
+            self.direction = 'L'
         self.state = state
         self.target_angle = rectify_angle_pi(state.angle + angle)
-        rospy.loginfo("Target angle: " + str( self.target_angle))
+        rospy.loginfo("Target angle: " + str(self.target_angle))
         self.done = False
+        self.turning_angle = angle
 
     def act(self):
-        #if still not at target, compute the next move to make.
+        # if still not at target, compute the next move to make.
 
         error = abs(self.target_angle - self.state.angle)
-        rospy.loginfo("Current angle: " + str( self.state.angle))
+        rospy.loginfo("Current angle: " + str(self.state.angle))
 
-        if(error > .02):
-            move_cmd = Twist()
-            move_cmd.angular.z = compute_vel_from_angle(error)
-            self.state.cmd_vel.publish(move_cmd)
-
+        if (error > .02):
+            if self.direction == 'L':
+                move_cmd = Twist()
+                move_cmd.angular.z = compute_vel_from_angle(error)
+                self.state.cmd_vel.publish(move_cmd)
+            elif self.direction == 'R':
+                move_cmd = Twist()
+                move_cmd.angular.z = -compute_vel_from_angle(error)
+                self.state.cmd_vel.publish(move_cmd)
         else:
             self.state.cmd_vel.publish(Twist())
             self.done = True
 
     def __str__(self):
-        print "Turned Left by " + angle + " radians"
-class TurnRight:
-    def __init__(self, state, angle):
-        self.state = state
-        self.target_angle = rectify_angle_pi(state.angle - angle)
-        print ("Target angle is" + str(state.angle))
-        rospy.loginfo("Target angle: " + str( self.target_angle))
-        self.done = False
-
-    def act(self):
-        error = abs(self.target_angle - self.state.angle)
-        rospy.loginfo("Current angle: " + str( self.state.angle))
-
-        if(error > .02):
-            move_cmd = Twist()
-            move_cmd.angular.z = -compute_vel_from_angle(error)
-            self.state.cmd_vel.publish(move_cmd)
-
-        else:
-            self.state.cmd_vel.publish(Twist())
-            self.done = True
-
-    def __str__(self):
-        print "Turned right by " + angle + " radians"
+        print "Turned Left by " + str(self.turning_angle) + " radians"
 
 class PenDraw:
     #get desired x_p, y_p,
@@ -218,24 +204,19 @@ def main():
     rate = rospy.Rate(20)
 
     #Queue of actions to take
-    actions = [('L', pi/2), ('R', pi/2), ('F', .5)]
+    actions = [('T', 2*pi/3), ('T', -3*pi/4), ('F', .5)]
     #while rospy is executing method run the queue of commands.
     while not rospy.is_shutdown():
         for i in range(0, len(actions)):
 
-            if actions[i][0] == 'L':
-                current_action = TurnLeft(state, actions[i][1])
-            elif actions[i][0] == 'R':
-                current_action = TurnRight(state, actions[i][1])
+            if actions[i][0] == 'T':
+                current_action = Turn(state, actions[i][1])
             else:
                 current_action = Forward(state, actions[i][1])
 
             while not current_action.done:
                 current_action.act()
                 rate.sleep()
-            print current_action
-            print state.angle
-            print state.x, state.y
         break
     rate.sleep()
 
