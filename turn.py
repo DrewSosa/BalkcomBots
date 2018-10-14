@@ -14,6 +14,7 @@ from math import sin
 from numpy.linalg import norm
 from numpy import array
 from numpy import invert as inv
+import numpy as np
 
 
 from angles import rectify_angle_pi
@@ -122,17 +123,18 @@ class PenDraw:
     #Send [v,w] to robot, probably using our turn and drive functions
     #which nets us a new Quwu
     #we stop when we find it reaches a certain distance.
-    def __init__(self,state,penv):
+    def __init__(self,state,penv, draw_time):
         self.state = state
         self.penv = penv
         self.rad = .5
+        self.draw_time = draw_time
 
 
-    def act(self, draw_time):
+    def act(self):
         move_cmd = Twist()
         rospy.loginfo("Target velocity: " + str(self.penv))
-        for i in xrange(draw_time):
-            updateposition(move_cmd)
+        for i in xrange(self.draw_time):
+            self.updateposition(move_cmd)
             self.state.cmd_vel.publish(move_cmd)
             rospy.sleep(1)
         rospy.loginfo("Target velocity: " + str(self.penv))
@@ -143,8 +145,8 @@ class PenDraw:
     def computeJac(self):
 
         Jac = np.zeros(shape=(2,2))
-        Jac[0] = [np.cos(state.angle), -self.rad * np.sin(state.angle)]
-        Jac[1] = [np.sin(state.angle), self.rad * np.cos(state.angle)]
+        Jac[0] = [np.cos(self.state.angle), -self.rad * np.sin(self.state.angle)]
+        Jac[1] = [np.sin(self.state.angle), self.rad * np.cos(self.state.angle)]
         return Jac
 
     def inverseJac(self, Jac):
@@ -153,7 +155,7 @@ class PenDraw:
     def updateposition(self, movecmd):
         #Multiply by the timestep -- which is the rate
         #should give [v,w]
-        control = inverseJac(self.computeJac) * self.penv
+        control = self.inverseJac(self.computeJac) * self.penv
 
         movecmd.linear.x = control[0]
         movecmd.angular.z = control[1]
