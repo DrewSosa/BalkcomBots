@@ -123,12 +123,11 @@ class PenDraw:
     #Send [v,w] to robot, probably using our turn and drive functions
     #which nets us a new Quwu
     #we stop when we find it reaches a certain distance.
-    def __init__(self,state,penv, draw_time):
+    def __init__(self,state, penv, draw_time):
         self.state = state
         self.penv = penv
         self.rad = .5
         self.draw_time = draw_time
-
 
     def act(self):
         move_cmd = Twist()
@@ -138,12 +137,9 @@ class PenDraw:
             self.state.cmd_vel.publish(move_cmd)
             rospy.sleep(1)
         rospy.loginfo("Target velocity: " + str(self.penv))
-
         #when should we stop it?
 
-
     def computeJac(self):
-
         Jac = np.zeros(shape=(2,2))
         Jac[0] = [np.cos(self.state.angle), -self.rad * np.sin(self.state.angle)]
         Jac[1] = [np.sin(self.state.angle), self.rad * np.cos(self.state.angle)]
@@ -155,7 +151,7 @@ class PenDraw:
     def updateposition(self, movecmd):
         #Multiply by the timestep -- which is the rate
         #should give [v,w]
-        control = self.inverseJac(self.computeJac) * self.penv
+        control = np.matmul(self.inverseJac(self.computeJac), self.penv)
 
         movecmd.linear.x = control[0]
         movecmd.angular.z = control[1]
@@ -210,16 +206,17 @@ def main():
     rate = rospy.Rate(20)
 
     #Queue of actions to take
-    actions = [('T', 2*pi/3), ('T', -3*pi/4), ('F', .5)]
+    actions = [('T', 2*pi/3), ('T', -3*pi/4), ('F', .5), ('PD', [.2, 0], 5)]
     #while rospy is executing method run the queue of commands.
     while not rospy.is_shutdown():
         for i in range(0, len(actions)):
 
             if actions[i][0] == 'T':
                 current_action = Turn(state, actions[i][1])
-            else:
+            if actions[i][0] == 'F':
                 current_action = Forward(state, actions[i][1])
-
+            else:
+                current_action = PenDraw(state, actions[i][1], actions[i][2])
             while not current_action.done:
                 current_action.act()
                 rate.sleep()
