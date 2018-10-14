@@ -141,20 +141,15 @@ class PenDraw:
 
     def act(self):
         move_cmd = Twist()
-        updateposition(move_cmd)
 
+        updateposition(move_cmd)
         self.state.cmd_vel.publish(move_cmd)
         rospy.loginfo("Target velocity: " + str(self.penv))
+
+        #when should we stop it?
         self.done = False
 
     def computeJac(self,angle):
-        dxpdx = 1
-        dxpdy = 0
-        dxpd0= -np.sin(theta)
-        dypdx = 0
-        dypdy = 1
-        Jac[0] = [dxpdx,dxpdy,dxpd0]
-        Jac[1] = [dypdx,dypdy,dypd0]
 
         Jac = np.zeros(shape=(2,2))
         Jac[0] = [np.cos(angle), -self.rad * np.sin(angle)]
@@ -162,20 +157,16 @@ class PenDraw:
         return Jac
 
     def inverseJac(self, Jac):
-        jprime = np.zeros(shape=(3,2))
-        jprime[0] = [np.sin(self.theta), np.sin(self.theta)]
-        jprime[1] = [np.cos(self.theta), np.cos(self.theta)]
-        jprime[2] = [self.robdiam, self.robdiam]
-        inv_jprime = pinv(jprime)
-        return inv_jprime
+        return pinv(jprime)
 
     def updateposition(self,q, movecmd):
         #Multiply by the timestep -- which is the rate
-        inverseJac(self.computeJac(pi/2))
+        #should give [v,w]
+        control = inverseJac(self.computeJac(pi/2)) * self.penv
 
-        movecmd.linear.x += 1/20 * qdot[0]
-        movecmd.linear.y += 1/20 * qdot[1]
-        movecmd.angular.z += 1/20 *qdot[2]
+        movecmd.linear.x += 1/20 * control[0]
+
+        movecmd.angular.z += 1/20 * control[1]
 
 class TurtlebotState:
     def __init__(self):
@@ -185,6 +176,7 @@ class TurtlebotState:
         self.x = None
         self.y = None
         self.angle = None
+        #ready indicates whether the odometry is received.
         self.ready = False
 
         self.cmd_vel = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
@@ -227,7 +219,7 @@ def main():
 
     #Queue of actions to take
     actions = [('L', pi/2), ('R', pi/2), ('F', .5)]
-
+    #while rospy is executing method run the queue of commands.
     while not rospy.is_shutdown():
         for i in range(0, len(actions)):
 
@@ -241,8 +233,9 @@ def main():
             while not current_action.done:
                 current_action.act()
                 rate.sleep()
-            print ("Done one Action")
+            print current_action
             print state.angle
+            print state.x, state.y
         break
     rate.sleep()
 
