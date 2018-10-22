@@ -153,7 +153,6 @@ class PenDraw:
         return Jac
 
     def inverseJac(self, Jac):
-        print("here")
         print(str(Jac))
         return inv(Jac)
 
@@ -213,8 +212,9 @@ def main():
     rospy.on_shutdown(state.shutdown)
 
     rate = rospy.Rate(20)
-    #('T', 2*pi/3), ('T', -3*pi/4), ('F', .5),
     #Queue of actions to take
+    #Right now, the robot turns to face direction 0, performs 2 ninety-degree turns with the pen, turns left and right, and then drives forward .5 meters
+
     actions = [('T', turn_angle), ('PD', [-.2, 0], 8), ('PD', [0, .2], 5), ('PD', [.2, 0], 5), ('T', 2*pi/3), ('T', -2*pi/3), ('F', .5)]
     #while rospy is executing method run the queue of commands.
     while not rospy.is_shutdown():
