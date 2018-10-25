@@ -1,9 +1,9 @@
 """Turn function for CS81 HW3.
-Team Members: Andrew Sosanya, Anne Sherrill, Dev Jhaveri, Lisa Oh
-
- Find in git repository BalkcomBots.
- '
- """
+    Team Members: Andrew Sosanya, Anne Sherrill, Dev Jhaveri, Lisa Oh
+    
+    Find in git repository BalkcomBots.
+    '
+    """
 
 import rospy
 from nav_msgs.msg import Odometry
@@ -28,11 +28,11 @@ def yaw_from_odom(msg):
     orientation_q = msg.pose.pose.orientation
     orientation_vec = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
     (roll, pitch, yaw) = euler_from_quaternion(orientation_vec)
-
+    
     return yaw
 
 def compute_vel_from_angle(error):
-
+    
     #If error is greater than one, keep going the same speed
     #else, slow down the robot as it approaches the target distance
     if error > 1:
@@ -45,10 +45,10 @@ def compute_vel_from_angle(error):
         return temp_vel
 
 def compute_vel_from_dist(error):
-
+    
     #If error is greater than one, keep going the same speed
     #else, slow down the robot as it approaches the target distance
-
+    
     #Hardcoded upperbound and lowerbound
     if error > .5:
         return .15
@@ -67,38 +67,38 @@ class Forward:
         self.target_y = self.state.y + dist * sin(self.state.angle)
         self.target_point = array((self.target_x, self.target_y))
         self.total_dist = dist
-
+    
     def act(self):
         #Error gives us our current distance from our target position.
         error = norm(self.target_point - array((self.state.x, self.state.y)))
         rospy.loginfo("Current x, y: " + str(self.state.x) + ", " + str(self.state.y))
-
+        
         #if still not at target, compute the next move to make.
         if(error > .02):
-
+            
             move_cmd = Twist()
             move_cmd.linear.x = compute_vel_from_dist(error)
             self.state.cmd_vel.publish(move_cmd)
-
+        
         else:
             #Push an empty Twist to stop the robot and finish the action
             self.state.cmd_vel.publish(Twist())
             self.done = True
 
-    def __str__(self):
-        print "drove " + str(self.total_dist) + " meters forwards"
+def __str__(self):
+    print "drove " + str(self.total_dist) + " meters forwards"
 
 class Turn:
-    def __init__(self, state, angle):
+    def __init__(self, state, angle): # give target angle wrt global frame
         self.state = state
-
+        
         self.target_angle = angle
-
+        
         provisional = self.target_angle - self.state.angle
-
+        
         if provisional >= pi:
             self.turn = provisional - 2*np.pi
-            
+        
         elif provisional <= -pi:
             self.turn = provisional + 2*np.pi
         else:
@@ -107,20 +107,20 @@ class Turn:
             self.direction = 'L'
         else:
             self.direction = 'R'
-
+        
         self.target_angle = rectify_angle_pi(self.target_angle)
         rospy.loginfo("Target angle: " + str(self.target_angle))
         self.done = False
         self.turning_angle = angle
-
+        
         print "here"
-        print provisional, self.target_angle, self.state.angle, self.direction
+    print provisional, self.target_angle, self.state.angle, self.direction
     def act(self):
         # if still not at target, compute the next move to make.
-
+        
         error = abs(self.target_angle - self.state.angle)
         rospy.loginfo("Current angle: " + str(self.state.angle))
-
+        
         if (error > .02):
             if self.direction == 'L':
                 move_cmd = Twist()
@@ -134,8 +134,8 @@ class Turn:
             self.state.cmd_vel.publish(Twist())
             self.done = True
 
-    def __str__(self):
-        print "Turned by " + str(self.turning_angle) + " radians"
+def __str__(self):
+    print "Turned by " + str(self.turning_angle) + " radians"
 
 class PenDraw:
     #get desired x_p, y_p,
@@ -149,7 +149,7 @@ class PenDraw:
         self.rad = .05
         self.draw_time = draw_time
         self.done = False
-
+    
     def act(self):
         move_cmd = Twist()
         rospy.loginfo("Target velocity: " + str(self.penv))
@@ -164,30 +164,30 @@ class PenDraw:
         #when should we stop it?
         self.state.cmd_vel.publish(Twist())
         self.done = True
-
+    
     def computeJac(self):
         Jac = np.zeros(shape=(2,2))
         Jac[0] = [np.cos(self.state.angle), -self.rad * np.sin(self.state.angle)]
         Jac[1] = [np.sin(self.state.angle), self.rad * np.cos(self.state.angle)]
         return Jac
-
+    
     def inverseJac(self, Jac):
         print("here")
         print(str(Jac))
         return inv(Jac)
-
+    
     def updateposition(self, movecmd):
         #Multiply by the timestep -- which is the rate
         #should give [v,w]
         control = np.matmul(self.inverseJac(self.computeJac()), self.penv)
-
+        
         movecmd.linear.x = control[0]
         movecmd.angular.z = control[1]
 
 class TurtlebotState:
     def __init__(self):
         # start up the subscribers to monitor state
-
+        
         self.subscriber_odom = rospy.Subscriber("/odom", Odometry, self.update_odom)
         self.laser_msg = rospy.Subscriber("/scan", LaserScan, self.update_laser)
         self.x = None
@@ -196,37 +196,37 @@ class TurtlebotState:
         self.ranges = None
         self.anginc = None
         self.anglestart = None
-
+        
         self.angle_max = None
         self.rmax = None
         self.rmin = None
         #ready indicates whether the odometry is received.
         self.odomReady = False
         self.laserReady = False
-
+        
         self.cmd_vel = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
         self.cmd_scan = rospy.Publisher('/scan', LaserScan, queue_size=1)
-
-
+        
+        
         # wait until odometry received, etc before
         # returning control
         while not self.odomReady or not self.laserReady:
             rate = rospy.Rate(20)
             rate.sleep()
 
-    def update_laser(self, scan):
-        rospy.loginfo("Scan done")
-        self.ranges = list(scan.ranges)
-        print len(self.ranges)
-        self.anginc = scan.angle_increment
-        self.anglestart = scan.angle_min 
+def update_laser(self, scan):
+    rospy.loginfo("Scan done")
+    self.ranges = list(scan.ranges)
+    print len(self.ranges)
+    self.anginc = scan.angle_increment
+        self.anglestart = scan.angle_min
         self.angle_max = scan.angle_max
         self.rmax = scan.range_max
         self.rmin = scan.range_min
-       
+        
         print (self.rmin in self.ranges)
         self.laserReady = True
-
+    
     def update_odom(self, msg):
         self.angle = yaw_from_odom(msg)
         #print (str(msg.pose.pose.position))
@@ -234,20 +234,40 @@ class TurtlebotState:
         self.y = msg.pose.pose.position.y
         self.odomReady = True
 
-    def shutdown(self):
-
-        rospy.loginfo("Shutting down turtlebot...")
-        self.cmd_vel.publish(Twist())
-        rospy.sleep(1)
-        rospy.loginfo("Goodbye.")
+def shutdown(self):
+    
+    rospy.loginfo("Shutting down turtlebot...")
+    self.cmd_vel.publish(Twist())
+    rospy.sleep(1)
+    rospy.loginfo("Goodbye.")
 
 class LaserTurn:
     def __init__(self,state):
         self.state = state
+        self.targetangle = get_target_angle() # edit
         self.done = False
         self.rate = rospy.Rate(20)
-
+    
     def act(self):
+        # closest = float("inf")
+        # index = None
+        # for i in xrange(len(self.state.ranges)):
+        #     if self.state.ranges[i] < closest:
+        #         if self.state.ranges[i] >= self.state.rmin:
+        #             closest = self.state.ranges[i]
+        #             index = i
+        closest, index = get_closest_info()
+        
+        # self.targetangle = index * self.state.anginc + self.state.angle
+        # self.targetangle = rectify_angle_pi(self.targetangle)
+        
+        turnfuc = Turn(self.state, self.targetangle)
+        while not turnfuc.done:
+            turnfuc.act()
+            self.rate.sleep()
+        self.done = True
+    
+    def get_closest_info(self):
         closest = float("inf")
         index = None
         for i in xrange(len(self.state.ranges)):
@@ -255,24 +275,20 @@ class LaserTurn:
                 if self.state.ranges[i] >= self.state.rmin:
                     closest = self.state.ranges[i]
                     index = i
+    
+    return closest, index
 
-        self.targetangle = index * self.state.anginc + self.state.angle
-        self.targetangle = rectify_angle_pi(self.targetangle)
-        print self.state.angle, self.state.anglestart, index, closest
-        turnfuc = Turn(self.state, self.targetangle)
-        while not turnfuc.done: 
-            turnfuc.act()
-            self.rate.sleep()
-        self.done = True
-
-
+def get_target_angle(self):
+    closest, index = get_closest_info()
+    targetangle = index * self.state.anginc + self.state.angle
+        targetangle = rectify_angle_pi(self.targetangle)
+        
+        return targetangle
 
     def follow(self):
         print self.state.anglestart
         print self.state.angle_max
-
-
-
+        
         closest = float("inf")
         index = None
         for i in xrange(45):
@@ -280,32 +296,32 @@ class LaserTurn:
                 if self.state.ranges[i] >= self.state.rmin:
                     closest = self.state.ranges[i]
                     index = i
-
+    
         for i in xrange(315,360):
             if self.state.ranges[i] < closest:
                 if self.state.ranges[i] >= self.state.rmin:
                     closest = self.state.ranges[i]
                     index = i
 
-        self.targetangle = index * self.state.anginc + self.state.angle
-        self.targetangle = rectify_angle_pi(self.targetangle)
-        print self.state.angle, self.state.anglestart, index, closest
+self.targetangle = index * self.state.anginc + self.state.angle
+    self.targetangle = rectify_angle_pi(self.targetangle)
+    print self.state.angle, self.state.anglestart, index, closest
         turnfuc = Turn(self.state, self.targetangle)
-        while not turnfuc.done: 
+        while not turnfuc.done:
             turnfuc.act()
             self.rate.sleep()
-        # forwardfuc = Forward(self.state)
-        
-
-        estdist = self.state.ranges[index]
+    # forwardfuc = Forward(self.state)
+    
+    
+    estdist = self.state.ranges[index]
         drive_dist = estdist - .5
-
+        
         if drive_dist > 0:
             forwardfuc = Forward(self.state, drive_dist)
             while not forwardfuc.done:
                 forwardfuc.act()
                 self.rate.sleep()
-        self.done = True
+self.done = True
 
 
 
@@ -315,10 +331,8 @@ class Ducklings:
         self.state = state
         self.done = False
         self.rate = rospy.Rate(20)
-
-
-       
-
+    
+    
     def act(self):
         closest = float("inf")
         index = None
@@ -327,44 +341,43 @@ class Ducklings:
                 if self.state.ranges[i] >= self.state.rmin:
                     closest = self.state.ranges[i]
                     index = i
-
+    
         for i in xrange(315,360):
             if self.state.ranges[i] < closest:
                 if self.state.ranges[i] >= self.state.rmin:
                     closest = self.state.ranges[i]
                     index = i
 
-        self.targetangle = index * self.state.anginc + self.state.angle
-        self.targetangle = rectify_angle_pi(self.targetangle)
-
-        #Forward
-        estdist = self.state.ranges[index]
+self.targetangle = index * self.state.anginc + self.state.angle
+    self.targetangle = rectify_angle_pi(self.targetangle)
+    
+    #Forward
+    estdist = self.state.ranges[index]
         drive_dist = estdist - .5
         move_cmd = Twist()
-        if drive_dist > 0: 
-
+        if drive_dist > 0:
+            
             self.target_x = self.state.x + drive_dist * cos(self.state.angle)
             self.target_y = self.state.y + drive_dist * sin(self.state.angle)
             self.target_point = array((self.target_x, self.target_y))
             self.total_dist = drive_dist
-
+            
             error = norm(self.target_point - array((self.state.x, self.state.y)))
             rospy.loginfo("Current x, y: " + str(self.state.x) + ", " + str(self.state.y))
-
+            
             #if still not at target, compute the next move to make.
             if(error > .02):
-
+                
                 
                 move_cmd.linear.x = compute_vel_from_dist(error)
+    
         
-
-
-
+        
         provisional = self.targetangle - self.state.angle
         if provisional != 0:
             if provisional >= pi:
                 self.turn = provisional - 2*np.pi
-                
+            
             elif provisional <= -pi:
                 self.turn = provisional + 2*np.pi
             else:
@@ -373,16 +386,16 @@ class Ducklings:
                 self.direction = 'L'
             else:
                 self.direction = 'R'
-
+        
             self.targetangle = rectify_angle_pi(self.targetangle)
             rospy.loginfo("Target angle: " + str(self.targetangle))
             self.done = False
             
-
-        #turn act
+            
+            #turn act
             error = abs(self.targetangle - self.state.angle)
             rospy.loginfo("Current angle: " + str(self.state.angle))
-
+            
             if (error > .02):
                 if self.direction == 'L':
                     
@@ -391,50 +404,74 @@ class Ducklings:
                 elif self.direction == 'R':
                     
                     move_cmd.angular.z = -compute_vel_from_angle(error)
-
-        self.state.cmd_vel.publish(move_cmd)  
+                        
+                        self.state.cmd_vel.publish(move_cmd)
 
 class WallFollow:
     def __init__(self, state):
         self.state = state
+        self.correct_done = False
         self.done = False
         self.rate = rospy.Rate(20)
-
+    
     def correct(self):
         correct_turn = LaserTurn(self.state)
-        correct_turn.act()
-        currect_drive = 
-
-    def act(self):
+        closest, index = LaserTurn.get_closest_info()
         
+        turn_angle = correct_turn.targetangle - pi
+        turn = Turn(self.state, turn_angle)
+        while not correct_turn.done:
+            turn.act()
+            self.rate.sleep()
+        
+        self.state.cmd_vel.publish(Twist())
+        self.correct_done = True
 
-            
+    def act(self, meters):
+        while not self.correct_done:
+            self.correct()
+            self.rate.sleep()
+        
+        traveled = 0
+        laser_turn = LaserTurn(self.state)
+        closest, index = laser_turn.get_closest_info
+        move_cmd = Twist()
+        
+        move_cmd.linear.x = compute_vel_from_dist(error) #error? meters - driven so far
+        
+        if closest > 1:
+        # turn left
+        
+        elif closest < 1:
+        
+        # turn right
+        self.done = True
 
 def main():
     #?
     rospy.init_node("turn_to")
-
+    
     #initialize our turtlebot to start taking actions.
-
+    
     state = TurtlebotState()
     print "The angle is" + str(state.angle)
     turn_angle = -1 * state.angle
     #Sends a shutdown message to rospy to stop execution
     rospy.on_shutdown(state.shutdown)
-
+    
     rate = rospy.Rate(20)
     #('T', 2*pi/3), ('T', -3*pi/4), ('F', .5),
     #Queue of actions to take
     # actions = [('T', turn_angle), ('PD', [-.2, 0], 8), ('PD', [0, .2], 5), ('PD', [.2, 0], 5), ('T', 2*pi/3), ('T', -2*pi/3), ('F', .5)]
     #while rospy is executing method run the queue of commands.
     lt = Ducklings(state)
-
+    
     while not rospy.is_shutdown():
         lt.act()
-        
+    
     # while not rospy.is_shutdown():
     #     for i in range(0, len(actions)):
-
+    
     #         if actions[i][0] == 'T':
     #             current_action = Turn(state, actions[i][1])
     #         elif actions[i][0] == 'F':
